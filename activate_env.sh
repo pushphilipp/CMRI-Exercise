@@ -2,6 +2,14 @@
 # CMRI Exercise Environment Activation Script
 # Usage: source activate_env.sh
 
+# Check if script is being sourced (not executed)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "❌ ERROR: This script must be sourced, not executed!"
+    echo "Usage: source activate_env.sh"
+    echo "   or: . activate_env.sh"
+    exit 1
+fi
+
 echo "🔬 Activating CMRI Exercise Virtual Environment"
 echo "================================================"
 
@@ -14,8 +22,13 @@ cd "$SCRIPT_DIR"
 # Activate virtual environment
 source venv/bin/activate
 
-# Display environment info
-echo "✅ Virtual environment activated"
+# Check if activation was successful
+if [[ "$VIRTUAL_ENV" != "" ]]; then
+    echo "✅ Virtual environment activated successfully"
+else
+    echo "❌ ERROR: Failed to activate virtual environment"
+    return 1
+fi
 echo "📁 Project directory: $(pwd)"
 echo "🐍 Python path: $(which python)"
 echo "📦 Installed packages:"
@@ -27,6 +40,7 @@ echo "   - Matplotlib: $(python -c 'import matplotlib; print(matplotlib.__versio
 
 echo ""
 echo "🚀 Ready to work on CMRI exercises!"
-echo "📝 To run lab04: cd lab04 && python lab04.py"
+echo "� You should now see (venv) in your prompt"
+echo "�📝 To run lab04: cd lab04 && python lab04.py"
 echo "🔗 To deactivate: deactivate"
 echo "================================================"

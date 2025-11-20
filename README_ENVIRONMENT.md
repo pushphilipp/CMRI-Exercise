@@ -8,14 +8,19 @@ A Python virtual environment has been configured with all necessary dependencies
 
 ### Quick Start
 
-1. **Activate the environment:**
+1. **Activate the environment (IMPORTANT: use `source`, not direct execution):**
    ```bash
-   # From anywhere, using full path:
+   # From the project directory:
+   source activate_env.sh
+   
+   # Or from anywhere, using full path:
    source /path/to/CMRI-Exercise/activate_env.sh
    
-   # Or from the project directory:
-   source activate_env.sh
+   # Alternative short form:
+   . activate_env.sh
    ```
+   
+   **Note:** You should see `(venv)` appear in your command prompt after successful activation.
 
 2. **Run lab exercises:**
    ```bash
