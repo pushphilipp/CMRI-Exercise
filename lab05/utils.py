@@ -184,17 +184,44 @@ def normalization(img):
 
 
 def calc_psnr(trg, src):
+    # Take absolute value for complex images
+    trg = np.abs(trg)
+    src = np.abs(src)
+    
+    # Handle edge cases
+    if trg.max() == 0 or src.max() == 0:
+        return float('nan')
+    
+    # Normalize both images to [0, 1] range
     norm_factor = trg.max()
-    trg = trg / norm_factor
-    src = src / norm_factor
-    return PSNR(trg, src, data_range=trg.max())
+    trg_norm = trg / norm_factor
+    src_norm = src / norm_factor
+    
+    # Calculate PSNR and handle infinite values
+    psnr_val = PSNR(trg_norm, src_norm, data_range=1.0)
+    
+    # Cap infinite values at a reasonable maximum
+    if np.isinf(psnr_val):
+        return 100.0  # Very high but finite PSNR for perfect reconstruction
+    
+    return psnr_val
 
 
 def calc_ssim(trg, src):
+    # Take absolute value for complex images
+    trg = np.abs(trg)
+    src = np.abs(src)
+    
+    # Handle edge cases
+    if trg.max() == 0 or src.max() == 0:
+        return float('nan')
+    
+    # Normalize both images to [0, 1] range
     norm_factor = trg.max()
-    trg = trg / norm_factor
-    src = src / norm_factor
-    return SSIM(trg, src, data_range=trg.max())
+    trg_norm = trg / norm_factor
+    src_norm = src / norm_factor
+    
+    return SSIM(trg_norm, src_norm, data_range=1.0)
 
 
 def annotate_gt(ax, font_size, font_color, font_weight):
