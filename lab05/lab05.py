@@ -29,9 +29,7 @@ class Lab05_op:
 
         :return: mc: combined image [nPE, nRO], dtype: float
         """
-        # Your code here ...
-
-        mc = None
+        mc = np.sqrt(np.sum(np.abs(m) ** 2, axis=axis))
         return mc
 
     def ls_comb(
@@ -50,13 +48,17 @@ class Lab05_op:
         # Use 'apply_psi' in this method if you need to used it instead of calling it by self.apply_psi.
         apply_psi = kwargs.get("apply_psi", self.apply_psi)
 
-        # Your code here ...
+        coil_imgs_c = coil_imgs
+        sens_maps_c = sens_maps
 
         if PSI is not None:
             # After 1.b.ii.2 and 1.b.ii.3, you should apply the noise correlation matrix to the coil sensitivity maps and coil images.
-            pass
+            sens_maps_c = apply_psi(sens_maps, PSI)
+            coil_imgs_c = apply_psi(coil_imgs, PSI)
 
-        coil_comb_img = None
+        numerator = np.sum(np.conj(sens_maps_c) * coil_imgs_c, axis=axis)
+        denominator = np.sum(np.abs(sens_maps_c) ** 2, axis=axis)
+        coil_comb_img = numerator / denominator
         return coil_comb_img
 
     def get_psi(self, noise_maps: np.ndarray) -> np.ndarray:
@@ -70,9 +72,8 @@ class Lab05_op:
         Returns:
             psi (np.ndarray):           noise covariance matrix [nCh,nCh], dtype: complex
         """
-        # Your code here ...
-
-        psi = None
+        noise_flat = noise_maps.reshape(-1, noise_maps.shape[-1])
+        psi = np.cov(noise_flat, rowvar=False)
         return psi
 
     def apply_psi(self, x: np.ndarray, psi: np.ndarray) -> np.ndarray:
@@ -94,9 +95,11 @@ class Lab05_op:
             x.shape[-1] == psi.shape[0]
         ), "The last dimension of x must be equal to the first dimension of psi"
 
-        # Your code here ...
-
-        y = None
+        shape = x.shape
+        x_flat = x.reshape(-1, shape[-1])
+        psi_inv_half = fractional_matrix_power(psi, -0.5)
+        y_flat = x_flat @ psi_inv_half
+        y = y_flat.reshape(shape)
 
         return y
 
@@ -111,9 +114,9 @@ class Lab05_op:
 
         :return: locs:      indices for SENSE reconstruction [R], dtype: int
         """
-        # Your code here ...
-
-        locs = None
+        step = int(np.ceil(PE / R))
+        base = idx_PE % step
+        locs = (base + np.arange(R) * step) % PE
 
         return locs
 
@@ -128,9 +131,8 @@ class Lab05_op:
 
         @return: i_n:       An PE index for aliased images, I_n
         """
-        # Your code here ...
-
-        i_n = None
+        alias_len = int(np.ceil(PE / R))
+        i_n = int(locs[0] % alias_len)
 
         return i_n
 
@@ -145,9 +147,8 @@ class Lab05_op:
 
         :return: C_pinv:        pseudo-inverse of coil sensitivity maps [R,nCh], dtype: complex
         """
-        # Your code here ...
-
-        C_pinv = None
+        sens = sens_maps[locs, idx_RO, :].T  # [nCh, R]
+        C_pinv = pinv(sens)
 
         return C_pinv
 
@@ -164,9 +165,8 @@ class Lab05_op:
         :return: unwrapped_coeff:   unwrapped coefficients [R], dtype: complex
 
         """
-        # Your code here ...
-
-        unwrapped_coeff = None
+        aliased_vec = aliased_imgs[idx_PE_alias, idx_RO, :]
+        unwrapped_coeff = sm_pinv @ aliased_vec
 
         return unwrapped_coeff
 
@@ -180,9 +180,8 @@ class Lab05_op:
 
         :return: g:             g-factor [R], dtype: float
         """
-        # Your code here ...
-
-        g = None
+        sens = sens_maps[locs, idx_RO, :].T  # [nCh, R]
+        g = utils.calc_g(sens)
 
         return g
 
@@ -220,11 +219,14 @@ class Lab05_op:
         for idx_PE, idx_RO in zip(*nonzero_idx):
             if not unaliased_img[idx_PE, idx_RO]:
                 # SENSE reconstruction
-                # Your code here ...
+                locs = sense_locs(idx_PE, PE, R)
+                idx_alias = sense_aliased_idx(PE, R, locs)
+                sm_pinv = sense_sm_pinv(sens_maps, locs, idx_RO)
+                unwrapped = sense_unwrap(aliased_imgs, sm_pinv, idx_alias, idx_RO)
+                unaliased_img[locs, idx_RO] = unwrapped
 
                 # g-factor
-                # Your code here ...
-                pass
+                g_map[locs, idx_RO] = sense_g_coef(sens_maps, locs, idx_RO)
 
         return unaliased_img, g_map
 
@@ -237,3 +239,58 @@ if __name__ == "__main__":
     # %%
     op = Lab05_op()
     kdata, sens_maps, noise_maps = op.load_data()
+
+    # %% Basic coil combinations
+    coil_imgs = utils.ifft2c(kdata)
+    psi = op.get_psi(noise_maps)
+
+    complex_sum_img = utils.cmplx_sum(coil_imgs)
+    sos_img = op.sos_comb(coil_imgs)
+    ls_img_no_psi = op.ls_comb(coil_imgs, sens_maps)
+    ls_img_psi = op.ls_comb(coil_imgs, sens_maps, psi)
+
+    utils.imshow(
+        [complex_sum_img, sos_img, ls_img_no_psi, ls_img_psi],
+        titles=["Complex sum", "SoS", "Matched filter\n(no PSI)", "Matched filter\n(with PSI)"],
+        suptitle="Coil combination results",
+    )
+
+    # %% Cartesian SENSE reconstruction
+    R_list = [2, 3, 4]
+    psnr_vals = []
+    ssim_vals = []
+
+    for R in R_list:
+        aliased_kdata = kdata[::R, :, :]
+        aliased_imgs = utils.ifft2c(aliased_kdata)
+
+        recon, g_map = op.sense_recon(aliased_imgs, sens_maps, psi, R)
+        psnr_vals.append(utils.calc_psnr(np.abs(ls_img_psi), np.abs(recon)))
+        ssim_vals.append(utils.calc_ssim(np.abs(ls_img_psi), np.abs(recon)))
+
+        err = utils.normalization(np.abs(recon - ls_img_psi))
+        utils.imshow(
+            [recon, err, g_map],
+            gt=np.abs(ls_img_psi),
+            titles=[f"SENSE R={R}", "Reconstruction error", "g-factor"],
+            suptitle=f"SENSE reconstruction (R={R})",
+            is_mag=False,
+        )
+
+    # %% Plot PSNR and SSIM versus acceleration
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(R_list, psnr_vals, marker="o")
+    plt.title("PSNR vs Acceleration")
+    plt.xlabel("R")
+    plt.ylabel("PSNR [dB]")
+
+    plt.subplot(1, 2, 2)
+    plt.plot(R_list, ssim_vals, marker="o")
+    plt.title("SSIM vs Acceleration")
+    plt.xlabel("R")
+    plt.ylabel("SSIM")
+    plt.tight_layout()
+    plt.show()
