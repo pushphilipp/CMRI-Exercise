@@ -38,9 +38,11 @@ class Lab04_op:
         Return:
             traj:               trajectory of the k-space data. (shape of [Readout])
         """
-        # Your code here ...
+        readout, spokes = k_radial.shape
 
-        traj = None
+        radii = np.linspace(-0.5, 0.5, readout)[:, None]
+        angles = self.PI / 2 + self.GA * np.arange(spokes)[None, :]
+        traj = radii * np.exp(1j * angles)
 
         return traj
 
@@ -54,9 +56,8 @@ class Lab04_op:
         Returns:
             spokes_nyq:      minimum number of spokes that satisfy Nyquist sampling theorem. (Ceilling up integer)
         """
-        # Your code here ...
-
-        spokes_nyq = None
+        readout, _ = k_radial.shape
+        spokes_nyq = int(np.ceil(self.PI * readout / 2))
 
         return spokes_nyq
 
@@ -71,9 +72,8 @@ class Lab04_op:
         Returns:
             k_cart:         Cartesian k-space data. (shape of [Readout, Readout])
         """
-        # Your code here ...
-
-        k_cart = None
+        readout, _ = k_radial.shape
+        k_cart = grid(k_radial, traj, readout)
 
         return k_cart
 
@@ -88,9 +88,9 @@ class Lab04_op:
         Returns:
             ramp:           ramp filter (shape of [Readout, 1])
         """
-        # Your code here ...
-
-        ramp = None
+        readout, _ = k_radial.shape
+        radii = np.linspace(-0.5, 0.5, readout)
+        ramp = np.abs(radii)[:, None]
 
         return ramp
 
@@ -109,9 +109,10 @@ class Lab04_op:
         # Use 'get_ramp' in this method if you need to used it instead of calling it by self.get_ramp.
         get_ramp = kwargs.get("get_ramp", self.get_ramp)
 
-        # Your code here ...
-
-        k_cart_ds = None
+        ramp = get_ramp(k_radial)
+        k_radial_ds = k_radial * ramp
+        readout, _ = k_radial.shape
+        k_cart_ds = grid(k_radial_ds, traj, readout)
 
         return k_cart_ds
 
@@ -131,9 +132,10 @@ class Lab04_op:
         # Use 'get_ramp' in this method if you need to used it instead of calling it by self.get_ramp.
         get_ramp = kwargs.get("get_ramp", self.get_ramp)
 
-        # Your code here ...
-
-        k_cart_ds_os = None
+        ramp = get_ramp(k_radial)
+        k_radial_ds = k_radial * ramp
+        readout, _ = k_radial.shape
+        k_cart_ds_os = grid(k_radial_ds, traj, readout * os_rate)
 
         return k_cart_ds_os
 
@@ -148,11 +150,21 @@ class Lab04_op:
         Returns:
             image_crop (np.ndarray):        cropped image (shape of target_shape)
         """
-        # Your code here ...
+        target_h, target_w = target_shape
+        h, w = ov_image.shape
 
-        image_crop = None
+        start_y = (h - target_h) // 2
+        start_x = (w - target_w) // 2
+
+        image_crop = ov_image[start_y:start_y + target_h, start_x:start_x + target_w]
 
         return image_crop
+
+    def decimate2d(self, ov_image, os_rate: int) -> np.complex128:
+        """Downsample an oversampled image by cropping to the central region."""
+
+        target_shape = (ov_image.shape[0] // os_rate, ov_image.shape[1] // os_rate)
+        return self.center_crop_2d(ov_image, target_shape)
 
     def get_c(self, k_radial, traj, os_rate) -> np.complex128:
         """
@@ -168,8 +180,12 @@ class Lab04_op:
         Returns:
             c:                          deapodization factor c(x,y) (shape of [Oversampled_Readout, Oversampled_Readout])
         """
-        # Your code here ...
-        c = None
+        readout, spokes = k_radial.shape
+        delta = np.zeros_like(k_radial, dtype=np.complex128)
+        delta[readout // 2, :] = 1.0
+
+        kernel_k = grid(delta, traj, readout * os_rate)
+        c = utils.ifft2c(kernel_k)
 
         return c
 
@@ -193,14 +209,19 @@ class Lab04_op:
         # PLEASE IGNORE HERE AND DO NOT MODIFY THIS PART.
         # Use 'grid_radial_ds_os' and 'decimate2d' in this method if you need to used them instead of calling them by self.grid_radial_ds_os and self.decimate2d.
         grid_radial_ds_os = kwargs.get("grid_radial_ds_os", self.grid_radial_ds_os)
-        decimate2d = kwargs.get("decimate2d", self.decimate2d)
+        center_crop_2d = kwargs.get("center_crop_2d", self.center_crop_2d)
         get_c = kwargs.get("get_c", self.get_c)
 
         a = 1
 
-        # Your code here ...
+        c = get_c(k_radial, traj, os_rate)
+        k_cart_ds_os = grid_radial_ds_os(k_radial, traj, os_rate)
+        recon_os = utils.ifft2c(k_cart_ds_os)
 
-        deapod_recon = None
+        eps = 1e-8
+        deapod = recon_os / (c + a + eps)
+
+        deapod_recon = center_crop_2d(deapod, (k_radial.shape[0], k_radial.shape[0]))
 
         return deapod_recon
 
@@ -216,9 +237,12 @@ class Lab04_op:
         Returns:
             ktraj:          trajectory of the k-space data for NUFFT. (shape of [2, Readout * Spokes])
         """
-        # Your code here ...
-
-        ktraj = None
+        readout, spokes = k_radial.shape
+        radii = np.linspace(-self.PI, self.PI, readout)[:, None]
+        angles = self.PI / 2 + self.GA * np.arange(spokes)[None, :]
+        traj = radii * np.exp(1j * angles)
+        ktraj_np = np.vstack([traj.real.ravel(order="F"), traj.imag.ravel(order="F")])
+        ktraj = torch.tensor(ktraj_np, dtype=torch.float32, device=self.device)
 
         return ktraj
 
@@ -237,9 +261,11 @@ class Lab04_op:
         # Use 'get_ramp' in this method if you need to used it instead of calling it by self.get_ramp.
         get_ramp = kwargs.get("get_ramp", self.get_ramp)
 
-        # Your code here ...
-
-        nufft_kdata = None
+        ramp = get_ramp(k_radial)
+        k_ds = k_radial * ramp
+        k_ds = k_ds.ravel(order="F")
+        nufft_kdata = torch.tensor(k_ds, dtype=torch.complex64, device=self.device)
+        nufft_kdata = nufft_kdata.unsqueeze(0).unsqueeze(0)
 
         return nufft_kdata
 
@@ -261,9 +287,13 @@ class Lab04_op:
         nufft_traj = kwargs.get("nufft_traj", self.nufft_traj)
         nufft_kdata = kwargs.get("nufft_kdata", self.nufft_kdata)
 
-        # Your code here ...
+        ktraj = nufft_traj(k_radial)
+        kdata = nufft_kdata(k_radial)
 
-        nufft_recon = None
+        adj_op = tkbn.KbNufftAdjoint(im_size=im_size).to(self.device)
+        recon = adj_op(kdata, ktraj)
+        recon = recon.squeeze().cpu().numpy()
+        nufft_recon = recon
 
         return nufft_recon
 
@@ -276,4 +306,41 @@ if __name__ == "__main__":
     # %%
     op = Lab04_op()
     k_radial = op.load_kdata()
-    utils.imshow([k_radial], norm=0.3)
+    utils.imshow([k_radial], norm=0.3, suptitle="Raw radial k-space")
+
+    traj = op.get_traj(k_radial)
+    utils.plot_spokes(traj, 10)
+
+    spokes_nyq = op.calc_nyquist(k_radial)
+    print(f"Nyquist spokes (min): {spokes_nyq}")
+
+    k_cart = op.grid_radial(k_radial, traj)
+    recon = utils.ifft2c(k_cart)
+    utils.imshow([np.log1p(np.abs(k_cart))], suptitle="Triangular gridded k-space (log)" )
+    utils.imshow([recon], suptitle="Basic gridding reconstruction", norm=0.4)
+
+    k_cart_ds = op.grid_radial_ds(k_radial, traj)
+    recon_ds = utils.ifft2c(k_cart_ds)
+    utils.imshow([np.log1p(np.abs(k_cart_ds))], suptitle="Density compensated gridded k-space (log)")
+    utils.imshow([recon_ds], suptitle="Density compensated reconstruction", norm=0.4)
+
+    os_rate = 2
+    k_cart_ds_os = op.grid_radial_ds_os(k_radial, traj, os_rate)
+    recon_ds_os = utils.ifft2c(k_cart_ds_os)
+    recon_ds_os_crop = op.center_crop_2d(recon_ds_os, k_radial.shape)
+    utils.imshow(
+        [np.log1p(np.abs(k_cart_ds_os))],
+        suptitle=f"Oversampled ({os_rate}x) gridded k-space (log)",
+    )
+    utils.imshow(
+        [recon_ds_os, recon_ds_os_crop],
+        titles=["Oversampled recon", "Cropped recon"],
+        suptitle="Oversampled reconstructions",
+        norm=0.4,
+    )
+
+    deapod_recon = op.deapodization(k_radial, traj, os_rate)
+    utils.imshow([deapod_recon], suptitle="Deapodized reconstruction", norm=0.4)
+
+    nufft_recon = op.nufft_recon(k_radial, (k_radial.shape[0], k_radial.shape[0]))
+    utils.imshow([nufft_recon], suptitle="NUFFT adjoint reconstruction", norm=0.4)
