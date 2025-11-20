@@ -1,0 +1,24 @@
+# Ignore PDF files
+*.pdf
+
+# Ignore MATLAB files
+*.mat
+
+# Ignore Jupyter Notebook files
+*.ipynb
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Keep Python files (no need to explicitly include, just don't ignore them)
+# *.py files will be tracked by default
+
+# Common Python ignores (optional - uncomment if needed)
+# __pycache__/
+# *.pyc
+# *.pyo
+# *.pyd
+# .Python
+# env/
+# venv/
+# .venv/
