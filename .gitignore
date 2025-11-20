@@ -13,12 +13,48 @@
 # Keep Python files (no need to explicitly include, just don't ignore them)
 # *.py files will be tracked by default
 
-# Common Python ignores (optional - uncomment if needed)
-# __pycache__/
-# *.pyc
-# *.pyo
-# *.pyd
-# .Python
-# env/
-# venv/
-# .venv/
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+*$py.class
+.Python
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+.env/
+env.bak/
+venv.bak/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
