@@ -1,8 +1,3 @@
-'''
-Author: Bruno Riemenschneider
-Email: bruno.riemenschneider@gmail.com
-'''
-
 import numpy as np
 from scipy.sparse import coo_matrix
 

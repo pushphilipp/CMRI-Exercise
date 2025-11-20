@@ -1,8 +1,5 @@
 """
 Computational Magnetic Resonance Imaging (CMRI) 2024/2025 Winter semester
-
-- Author          : Jinho Kim
-- Email           : <jinho.kim@fau.de>
 """
 
 from typing import Tuple
