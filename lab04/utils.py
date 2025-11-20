@@ -1,8 +1,5 @@
 '''
 A package containing utility functions for computational MRI exercises.
-
-Author          : Jinho Kim
-Email           : jinho.kim@fau.de
 '''
 from pathlib import Path
 from typing import Optional, Tuple
