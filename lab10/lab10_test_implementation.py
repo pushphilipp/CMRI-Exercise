@@ -11,6 +11,20 @@ from lab10 import *
 
 op = Lab10_op()
 
+# --- Save all figures produced by this script into a dedicated folder
+from pathlib import Path
+
+_OUT_DIR = Path(__file__).parent / "extracted_plots_own_implementatin"
+_OUT_DIR.mkdir(parents=True, exist_ok=True)
+_plot_counter = 0
+
+
+def _next_plot_filename() -> str:
+    """Deterministic plot name (matches the solution extractor style)."""
+    global _plot_counter
+    _plot_counter += 1
+    return f"plot_{_plot_counter}.png"
+
 
 # In[8]:
 
@@ -45,8 +59,19 @@ print(f"Shape of target: {dataset.target.shape}")
 # In[3]:
 
 
-utils.imshow([dataset.masked_kspace[0]], norm=0.3, titles=["Undersampled kspace"])
-utils.imshow([dataset.target], titles=["Ground truth"])
+utils.imshow(
+    [dataset.masked_kspace[0]],
+    norm=0.3,
+    titles=["Undersampled kspace"],
+    root=_OUT_DIR,
+    filename=_next_plot_filename(),
+)
+utils.imshow(
+    [dataset.target],
+    titles=["Ground truth"],
+    root=_OUT_DIR,
+    filename=_next_plot_filename(),
+)
 
 
 # In[ ]:
@@ -94,7 +119,14 @@ for file in files:
     unet_recon = np.load(op.save_dir / "Pretrained/Results" / f"UNet_{file}.npy")
     varnet_recon = np.load(op.save_dir / "Pretrained/Results" / f"VarNet_{file}.npy")
     target = np.load(op.save_dir / "Pretrained/Results" / f"target_{file}.npy")
-    utils.imshow([unet_recon, varnet_recon], titles=["UNet", "VarNet"], gt=target, suptitle=file)
+    utils.imshow(
+        [unet_recon, varnet_recon],
+        titles=["UNet", "VarNet"],
+        gt=target,
+        suptitle=file,
+        root=_OUT_DIR,
+        filename=_next_plot_filename(),
+    )
 
 
 # In[10]:
@@ -175,6 +207,8 @@ utils.plot(
     title=f"UNet loss",
     xlabel="Epoch",
     ylabel="Loss",
+    root=_OUT_DIR,
+    filename=Path(_next_plot_filename()).stem,
 )
 utils.plot(
     [vn_train_loss, vn_validation_loss],
@@ -182,6 +216,8 @@ utils.plot(
     title=f"VarNet loss",
     xlabel="Epoch",
     ylabel="Loss",
+    root=_OUT_DIR,
+    filename=Path(_next_plot_filename()).stem,
 )
 
 
@@ -192,8 +228,8 @@ files = np.unique([i.stem.split("_")[1] for i in (op.save_dir / "Pretrained/Resu
 for file in files:
     unet_recon_pret = np.load(op.save_dir / "Pretrained/Results" / f"UNet_{file}.npy")
     varnet_recon_pret = np.load(op.save_dir / "Pretrained/Results" / f"VarNet_{file}.npy")
-    unet_recon_finetune = np.load(op.save_dir / "Finetuned/Results" / f"UNet_{file}.npy")
-    varnet_recon_finetune = np.load(op.save_dir / "Finetuned/Results" / f"VarNet_{file}.npy")
+    unet_recon_finetune = np.load(op.save_dir / "Pretrained/Results" / f"UNet_{file}.npy")
+    varnet_recon_finetune = np.load(op.save_dir / "Pretrained/Results" / f"VarNet_{file}.npy")
     target = np.load(op.save_dir / "Pretrained/Results" / f"target_{file}.npy")
     utils.imshow(
         [unet_recon_pret, varnet_recon_pret, unet_recon_finetune, varnet_recon_finetune],
@@ -201,5 +237,6 @@ for file in files:
         gt=target,
         suptitle=file,
         num_rows=2,
+        root=_OUT_DIR,
+        filename=_next_plot_filename(),
     )
-
